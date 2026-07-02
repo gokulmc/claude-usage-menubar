@@ -8,7 +8,7 @@ A tiny macOS menu bar app that shows your Claude usage at a glance — two rings
 - **Inner ring** — your weekly limit
 - Rings turn orange, then red, as you approach a limit
 - Click the icon for exact percentages and reset times
-- Refreshes on click, when your Mac wakes up, and every 5 minutes in the background
+- Refreshes on click, when your Mac wakes up, and every 15 minutes in the background
 
 ## Download
 

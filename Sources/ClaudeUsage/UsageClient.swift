@@ -24,21 +24,46 @@ final class UsageClient {
     private let keychainService = "Claude Code-credentials"
     private let usageURL = URL(string: "https://api.anthropic.com/api/oauth/usage")!
 
+    // Every SecItemCopyMatching call against this self-signed, non-Apple-signed
+    // app is a Keychain "partition" check that macOS periodically re-prompts
+    // for (roughly every 15-65 min observed), independent of the earlier
+    // "Always Allow" choice -- that grant simply doesn't persist reliably for
+    // non-Developer-ID-signed code. Reading the token once and reusing it
+    // across polls (instead of re-reading on every 5-min timer fire) cuts
+    // Keychain touches from "every poll, forever" down to "once per launch,
+    // plus whenever the cached token actually stops working" -- which is by
+    // far the biggest source of unnecessary prompts.
+    private var cachedToken: String?
+
     func fetchUsage(completion: @escaping (Result<UsageSnapshot, UsageError>) -> Void) {
-        guard let token = readAccessToken() else {
+        let token: String
+        if let cachedToken {
+            token = cachedToken
+        } else if let fresh = readAccessToken() {
+            cachedToken = fresh
+            token = fresh
+        } else {
             completion(.failure(.noCredentials))
             return
         }
+
         performRequest(token: token) { [weak self] result in
             switch result {
             case .success(let snapshot):
                 completion(.success(snapshot))
             case .failure(.unauthorized):
-                // Token may have rotated; re-read once and retry.
-                guard let self, let retryToken = self.readAccessToken(), retryToken != token else {
+                // Cached token stopped working (rotated or revoked) -- drop it
+                // and re-read from the Keychain once.
+                guard let self else {
                     completion(.failure(.unauthorized))
                     return
                 }
+                self.cachedToken = nil
+                guard let retryToken = self.readAccessToken(), retryToken != token else {
+                    completion(.failure(.unauthorized))
+                    return
+                }
+                self.cachedToken = retryToken
                 self.performRequest(token: retryToken, completion: completion)
             case .failure(let error):
                 completion(.failure(error))
