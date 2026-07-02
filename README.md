@@ -10,13 +10,21 @@ A tiny macOS menu bar app that shows your Claude usage at a glance — two rings
 - Click the icon for exact percentages and reset times
 - Refreshes on click, when your Mac wakes up, and every 5 minutes in the background
 
+## Download
+
+**[Download the latest release](https://github.com/gokulmc/claude-usage-menubar/releases/latest)** — open the `.dmg` and drag ClaudeUsage into Applications. No Xcode or Swift needed.
+
+This build isn't notarized (no Apple Developer account behind it), so macOS will warn about an unidentified developer on first launch. Right-click the app in Applications and choose **Open** to bypass that, just once.
+
+Prefer to build it yourself instead? See [Build from source](#build-from-source) below.
+
 ## Requirements
 
 - macOS 13 (Ventura) or later
 - [Claude Code](https://claude.com/claude-code) installed and logged in — this app reads the same OAuth credentials Claude Code stores in your macOS Keychain, so there's nothing extra to configure
-- Xcode Command Line Tools (for the Swift compiler): `xcode-select --install`
+- Building from source only: Xcode Command Line Tools (for the Swift compiler): `xcode-select --install`
 
-## Install
+## Build from source
 
 ```bash
 git clone https://github.com/gokulmc/claude-usage-menubar.git
