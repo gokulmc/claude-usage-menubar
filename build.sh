@@ -26,6 +26,8 @@ if security find-certificate -c "${SIGN_IDENTITY}" >/dev/null 2>&1; then
     codesign --force --deep --sign "${SIGN_IDENTITY}" "${APP_BUNDLE}"
 else
     echo "==> Code signing (ad-hoc — ${SIGN_IDENTITY} not found in keychain)"
+    echo "    Tip: run ./setup-signing.sh once to stop macOS from repeatedly"
+    echo "    asking for your password to read the Keychain item."
     codesign --force --deep --sign - "${APP_BUNDLE}"
 fi
 

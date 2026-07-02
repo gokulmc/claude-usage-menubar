@@ -21,14 +21,19 @@ A tiny macOS menu bar app that shows your Claude usage at a glance — two rings
 ```bash
 git clone https://github.com/gokulmc/claude-usage-menubar.git
 cd claude-usage-menubar
+./setup-signing.sh   # recommended, one-time — see below
 ./build.sh
 ```
 
 `build.sh` builds a release binary, packages it as `ClaudeUsage.app`, code-signs it, copies it to `/Applications`, and launches it. The icon should appear in your menu bar within a couple of seconds.
 
-The first launch will ask for permission to read the `Claude Code-credentials` Keychain item — click **Always Allow**. You'll only see this once.
+The first launch will ask for permission to read the `Claude Code-credentials` Keychain item — click **Always Allow**.
 
 To update after pulling new changes, just run `./build.sh` again.
+
+### Why `setup-signing.sh`?
+
+`build.sh` needs a stable code-signing identity to reuse across rebuilds; without one it falls back to ad-hoc signing, and macOS will periodically ask for your login password again to re-confirm Keychain access (see [Troubleshooting](#troubleshooting) for why). `setup-signing.sh` creates and trusts a local identity (`ClaudeUsageLocalSign`) so you only ever see that prompt once. It's scoped entirely to your own login keychain — no sudo, no system-wide changes.
 
 ### Launch at login
 
@@ -53,7 +58,12 @@ This uses an internal, undocumented API endpoint, so it could change or break wi
 
 **Menu bar item shows a gray "!" badge.** The last refresh failed — usually because Claude Code's credentials need refreshing. Open Claude Code and run any command, then click **Refresh Now** in the app's menu.
 
-**macOS keeps asking for my login password after every rebuild.** This shouldn't happen — `build.sh` signs the app with a stable local identity (`ClaudeUsageLocalSign`) so the same "Always Allow" choice persists across rebuilds. If that identity doesn't exist yet on your machine, the script falls back to ad-hoc signing, which *will* re-prompt on every rebuild. To fix it, create a local self-signed code-signing certificate named `ClaudeUsageLocalSign` in your login keychain (Keychain Access → Certificate Assistant → Create a Certificate → type: Code Signing) and re-run `./build.sh`.
+**macOS keeps asking for my login password, over and over.** Run `./setup-signing.sh` then `./build.sh`. Two different causes produce this symptom:
+
+- *Every time you rebuild:* the app is ad-hoc signed (no `ClaudeUsageLocalSign` identity was found), so each rebuild produces a new binary hash that macOS treats as a "different app."
+- *Every 30-60+ minutes, or after your Mac sleeps, even without rebuilding:* the app is signed with a self-signed certificate that isn't marked as *trusted*. macOS can't durably cache your "Always Allow" decision for an untrusted certificate, so it silently re-validates — and re-prompts — after the Keychain locks (sleep, idle timeout, etc).
+
+`setup-signing.sh` fixes both: it creates the `ClaudeUsageLocalSign` identity if missing, and trusts it for code signing, which is the step that makes "Always Allow" actually stick.
 
 ## License
 
