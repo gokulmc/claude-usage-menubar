@@ -7,6 +7,8 @@ enum RingIcon {
         let image = NSImage(size: size, flipped: false) { rect in
             let center = NSPoint(x: rect.midX, y: rect.midY)
 
+            drawSquareBorder(in: rect)
+
             drawTrack(center: center, radius: 7.5, lineWidth: 2.5)
             drawTrack(center: center, radius: 4.0, lineWidth: 2.5)
 
@@ -16,7 +18,7 @@ enum RingIcon {
             }
             if let weeklyPercent {
                 drawArc(center: center, radius: 4.0, lineWidth: 2.5,
-                        percent: weeklyPercent, color: color(for: weeklyPercent, base: .systemPurple, isStale: isStale))
+                        percent: weeklyPercent, color: color(for: weeklyPercent, base: .systemGreen, isStale: isStale))
             }
 
             if isStale {
@@ -27,6 +29,15 @@ enum RingIcon {
         }
         image.isTemplate = false
         return image
+    }
+
+    private static func drawSquareBorder(in rect: NSRect) {
+        let inset: CGFloat = 1
+        let borderRect = rect.insetBy(dx: inset, dy: inset)
+        let path = NSBezierPath(rect: borderRect)
+        path.lineWidth = 1
+        NSColor.labelColor.withAlphaComponent(0.6).setStroke()
+        path.stroke()
     }
 
     private static func drawTrack(center: NSPoint, radius: CGFloat, lineWidth: CGFloat) {
