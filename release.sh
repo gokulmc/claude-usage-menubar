@@ -16,16 +16,21 @@ cd "$(dirname "$0")"
 
 APP_NAME="ClaudeUsage"
 BUILD_DIR=".build/release"
-APP_BUNDLE="${APP_NAME}.app"
+# Deliberately NOT "ClaudeUsage.app" -- that path is build.sh's, which installs
+# a *trusted-identity* build to /Applications for daily use. Reusing the same
+# name here risked this ad-hoc-signed copy getting mistaken for (or manually
+# copied over) that one, silently downgrading the installed app's signature
+# and bringing back the repeated Keychain prompts.
+STAGING_DIR=".release-build"
+APP_BUNDLE="${STAGING_DIR}/${APP_NAME}.app"
 VERSION="$(defaults read "$(pwd)/Support/Info.plist" CFBundleShortVersionString 2>/dev/null || echo "1.0")"
 DMG_NAME="ClaudeUsage-${VERSION}.dmg"
-STAGING_DIR=".dmg-staging"
 
 echo "==> Building release binary"
 swift build -c release
 
 echo "==> Assembling app bundle"
-rm -rf "${APP_BUNDLE}"
+rm -rf "${STAGING_DIR}" "${DMG_NAME}"
 mkdir -p "${APP_BUNDLE}/Contents/MacOS"
 mkdir -p "${APP_BUNDLE}/Contents/Resources"
 cp "${BUILD_DIR}/${APP_NAME}" "${APP_BUNDLE}/Contents/MacOS/${APP_NAME}"
@@ -35,9 +40,6 @@ echo "==> Code signing (ad-hoc, for a stable standalone identity)"
 codesign --force --deep --sign - "${APP_BUNDLE}"
 
 echo "==> Building ${DMG_NAME}"
-rm -rf "${STAGING_DIR}" "${DMG_NAME}"
-mkdir -p "${STAGING_DIR}"
-cp -R "${APP_BUNDLE}" "${STAGING_DIR}/"
 ln -s /Applications "${STAGING_DIR}/Applications"
 
 hdiutil create -volname "${APP_NAME}" -srcfolder "${STAGING_DIR}" -ov -format UDZO "${DMG_NAME}"

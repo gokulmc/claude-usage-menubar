@@ -1,6 +1,6 @@
 .build/
 *.app
 *.dmg
-.dmg-staging/
+.release-build/
 .swiftpm/
 .DS_Store
