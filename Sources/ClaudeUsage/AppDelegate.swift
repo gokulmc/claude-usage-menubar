@@ -15,6 +15,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private let weeklyInfoItem = NSMenuItem(title: "Weekly: —", action: nil, keyEquivalent: "")
     private let launchAtLoginItem = NSMenuItem(title: "Launch at Login", action: #selector(toggleLaunchAtLogin), keyEquivalent: "")
 
+    // Rebuilt on every refresh since the set of models with their own scoped
+    // limit can change (e.g. Sonnet/Fable/Opus each only show up here while
+    // they actually have a distinct weekly cap active).
+    private var modelLimitItems: [NSMenuItem] = []
+    private weak var menu: NSMenu?
+
     func applicationDidFinishLaunching(_ notification: Notification) {
         NSApp.setActivationPolicy(.accessory)
 
@@ -44,6 +50,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         menu.addItem(quitItem)
 
         statusItem.menu = menu
+        self.menu = menu
         updateIcon()
 
         refreshTimer = Timer.scheduledTimer(withTimeInterval: 900, repeats: true) { [weak self] _ in
@@ -131,9 +138,34 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             let staleSuffix = isStale ? "  (stale)" : ""
             fiveHourInfoItem.title = "5-hour: \(Int(snapshot.fiveHour.utilization))%\(resetSuffix(for: snapshot.fiveHour.resetsAt))\(staleSuffix)"
             weeklyInfoItem.title = "Weekly: \(Int(snapshot.sevenDay.utilization))%\(resetSuffix(for: snapshot.sevenDay.resetsAt))\(staleSuffix)"
+            updateModelLimitItems(snapshot.modelWeeklyLimits, staleSuffix: staleSuffix)
         } else if let error = lastError {
             fiveHourInfoItem.title = message(for: error)
             weeklyInfoItem.title = "No data yet"
+            updateModelLimitItems([], staleSuffix: "")
+        }
+    }
+
+    private func updateModelLimitItems(_ limits: [ModelWeeklyLimit], staleSuffix: String) {
+        guard let menu else { return }
+
+        for item in modelLimitItems {
+            menu.removeItem(item)
+        }
+        modelLimitItems.removeAll()
+
+        let weeklyIndex = menu.index(of: weeklyInfoItem)
+        guard weeklyIndex >= 0 else { return }
+
+        for (offset, limit) in limits.enumerated() {
+            let item = NSMenuItem(
+                title: "  \(limit.modelName) weekly: \(Int(limit.utilization))%\(resetSuffix(for: limit.resetsAt))\(staleSuffix)",
+                action: nil,
+                keyEquivalent: ""
+            )
+            item.isEnabled = false
+            menu.insertItem(item, at: weeklyIndex + 1 + offset)
+            modelLimitItems.append(item)
         }
     }
 

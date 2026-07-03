@@ -6,9 +6,19 @@ struct UsageWindow {
     let resetsAt: Date?
 }
 
+struct ModelWeeklyLimit {
+    let modelName: String
+    let utilization: Double
+    let resetsAt: Date?
+}
+
 struct UsageSnapshot {
     let fiveHour: UsageWindow
     let sevenDay: UsageWindow
+    // Per-model weekly caps (e.g. Sonnet, Fable) -- the API only includes an
+    // entry here for models that currently have their own scoped limit, so
+    // this can be empty or contain any subset of models.
+    let modelWeeklyLimits: [ModelWeeklyLimit]
 }
 
 enum UsageError: Error {
@@ -111,7 +121,25 @@ final class UsageClient {
               let sevenDay = parseWindow(sevenDayDict) else {
             return nil
         }
-        return UsageSnapshot(fiveHour: fiveHour, sevenDay: sevenDay)
+        let modelWeeklyLimits = parseModelWeeklyLimits(json["limits"] as? [[String: Any]] ?? [])
+        return UsageSnapshot(fiveHour: fiveHour, sevenDay: sevenDay, modelWeeklyLimits: modelWeeklyLimits)
+    }
+
+    private static func parseModelWeeklyLimits(_ limits: [[String: Any]]) -> [ModelWeeklyLimit] {
+        limits.compactMap { entry -> ModelWeeklyLimit? in
+            guard entry["kind"] as? String == "weekly_scoped",
+                  let percent = entry["percent"] as? Double,
+                  let scope = entry["scope"] as? [String: Any],
+                  let model = scope["model"] as? [String: Any],
+                  let modelName = model["display_name"] as? String else {
+                return nil
+            }
+            var resetsAt: Date? = nil
+            if let resetsAtString = entry["resets_at"] as? String {
+                resetsAt = ISO8601DateFormatter.usageFormatter.date(from: resetsAtString)
+            }
+            return ModelWeeklyLimit(modelName: modelName, utilization: percent, resetsAt: resetsAt)
+        }
     }
 
     private static func parseWindow(_ dict: [String: Any]) -> UsageWindow? {
