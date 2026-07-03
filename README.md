@@ -73,6 +73,10 @@ This uses an internal, undocumented API endpoint, so it could change or break wi
 
 `setup-signing.sh` fixes both: it creates the `ClaudeUsageLocalSign` identity if missing, and trusts it for code signing, which is the step that makes "Always Allow" actually stick.
 
+## Changelog
+
+See [CHANGELOG.md](CHANGELOG.md).
+
 ## License
 
 [MIT](LICENSE)
