@@ -7,7 +7,7 @@ A tiny macOS menu bar app that shows your Claude usage at a glance — two rings
 - **Outer ring** — your 5-hour session limit
 - **Inner ring** — your weekly limit
 - Rings turn orange, then red, as you approach a limit
-- Click the icon for exact percentages and reset times
+- Click the icon for exact percentages and reset times — including any per-model weekly caps (e.g. Sonnet, Fable) your plan tracks separately
 - Refreshes on click, when your Mac wakes up, and every 15 minutes in the background
 
 ## Download
