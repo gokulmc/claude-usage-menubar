@@ -41,7 +41,7 @@ To update after pulling new changes, just run `./build.sh` again.
 
 ### Why `setup-signing.sh`?
 
-`build.sh` needs a stable code-signing identity to reuse across rebuilds; without one it falls back to ad-hoc signing, and macOS will periodically ask for your login password again to re-confirm Keychain access (see [Troubleshooting](#troubleshooting) for why). `setup-signing.sh` creates and trusts a local identity (`ClaudeUsageLocalSign`) so you only ever see that prompt once. It's scoped entirely to your own login keychain — no sudo, no system-wide changes.
+`build.sh` needs a stable code-signing identity to reuse across rebuilds; without one it falls back to ad-hoc signing, and every rebuild looks like a brand-new app to the Keychain, so macOS asks for your login password again after each one. `setup-signing.sh` creates and trusts a local identity (`ClaudeUsageLocalSign`) so rebuilds keep the same identity and don't each cost you a prompt. It's scoped entirely to your own login keychain — no sudo, no system-wide changes. (It can't make the prompt disappear *entirely* — see [Troubleshooting](#troubleshooting) for the fine print — but combined with the app's own token cache, prompts should be rare.)
 
 ### Launch at login
 
@@ -70,12 +70,13 @@ The tradeoff: there are now two Keychain items holding the same live OAuth token
 
 **Menu bar item shows a gray "!" badge.** The last refresh failed — usually because Claude Code's credentials need refreshing. Open Claude Code and run any command, then click **Refresh Now** in the app's menu.
 
-**macOS keeps asking for my login password, over and over.** Run `./setup-signing.sh` then `./build.sh`. Two different causes produce this symptom:
+**macOS asks for my login password when the app reads the Keychain.** Some of this is expected and some is fixable:
 
-- *Every time you rebuild:* the app is ad-hoc signed (no `ClaudeUsageLocalSign` identity was found), so each rebuild produces a new binary hash that macOS treats as a "different app."
-- *Every 30-60+ minutes, or after your Mac sleeps, even without rebuilding:* the app is signed with a self-signed certificate that isn't marked as *trusted*. macOS can't durably cache your "Always Allow" decision for an untrusted certificate, so it silently re-validates — and re-prompts — after the Keychain locks (sleep, idle timeout, etc).
+- *Expected:* the first-ever read of Claude Code's credentials item, and again whenever Claude Code rotates its token and the app has to re-read it. Thanks to the app's own token cache (see [How it works](#how-it-works)), normal launches and polls in between never touch that item, so this should be occasional, not constant.
+- *Every time you rebuild:* the app is ad-hoc signed (no `ClaudeUsageLocalSign` identity was found), so each rebuild produces a new binary hash that macOS treats as a "different app." Run `./setup-signing.sh` once, then `./build.sh` — rebuilds then reuse one stable identity.
+- *The hard limit:* clicking "Always Allow" never sticks permanently for this app, no matter what. macOS only grants durable silent Keychain access to code signed with a certificate that chains to Apple's root (a paid Developer ID certificate); for self-signed or ad-hoc builds, `securityd` re-validates on its own schedule and re-prompts every so often (observed anywhere from ~15 to ~65 minutes when the app reads the cross-app item repeatedly). The token cache exists precisely to make those cross-app reads rare, which is the best that can be done without an Apple Developer account.
 
-`setup-signing.sh` fixes both: it creates the `ClaudeUsageLocalSign` identity if missing, and trusts it for code signing, which is the step that makes "Always Allow" actually stick.
+**Can it use Touch ID instead of a password?** No — this specific Keychain authorization dialog is a legacy dialog type that macOS never offers Touch ID for, even on Macs with Touch ID enrolled. Nothing the app can do about it; the mitigation is making the prompt rare (above), not making it more convenient.
 
 ## Changelog
 
