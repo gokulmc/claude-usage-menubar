@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- The token is now also cached in a second Keychain item this app creates and owns, so normal operation no longer touches Claude Code's item (and therefore rarely triggers macOS's confirmation prompt at all) — only when the underlying token actually rotates. See the README's "How it works" section for the security tradeoff this involves before building it yourself.
+
 ## v1.1.0
 
 - Dropdown now shows per-model weekly limits (e.g. Sonnet, Fable) whenever your plan tracks one separately, in addition to the overall 5-hour and weekly numbers.

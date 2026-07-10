@@ -31,26 +31,39 @@ enum UsageError: Error {
 
 final class UsageClient {
 
-    private let keychainService = "Claude Code-credentials"
+    // Claude Code's own item -- reading it is a *cross-app* Keychain access,
+    // which is what triggers macOS's "wants to use your confidential
+    // information" prompt, and (for this self-signed, non-Apple-signed app)
+    // that prompt keeps resurfacing periodically no matter what.
+    private let sourceKeychainService = "Claude Code-credentials"
+
+    // An item this app creates and owns. Reading back an item you created
+    // yourself is *never* prompted by macOS, signed or not -- the whole
+    // cross-app confirmation dance only applies to reading someone else's
+    // item. Keeping our own persisted copy here means normal operation never
+    // touches Claude Code's item at all, so it never prompts in the common
+    // case. Same OS-level Keychain encryption as any other item -- this
+    // isn't a weaker storage mechanism, just one we don't need permission
+    // from another app to read.
+    private let cacheKeychainService = "com.gokul.claude-usage.token-cache"
+
     private let usageURL = URL(string: "https://api.anthropic.com/api/oauth/usage")!
 
-    // Every SecItemCopyMatching call against this self-signed, non-Apple-signed
-    // app is a Keychain "partition" check that macOS periodically re-prompts
-    // for (roughly every 15-65 min observed), independent of the earlier
-    // "Always Allow" choice -- that grant simply doesn't persist reliably for
-    // non-Developer-ID-signed code. Reading the token once and reusing it
-    // across polls (instead of re-reading on every 5-min timer fire) cuts
-    // Keychain touches from "every poll, forever" down to "once per launch,
-    // plus whenever the cached token actually stops working" -- which is by
-    // far the biggest source of unnecessary prompts.
+    // In-memory copy so a single run doesn't even touch the Keychain twice.
     private var cachedToken: String?
 
     func fetchUsage(completion: @escaping (Result<UsageSnapshot, UsageError>) -> Void) {
         let token: String
         if let cachedToken {
             token = cachedToken
-        } else if let fresh = readAccessToken() {
+        } else if let persisted = readOwnCachedToken() {
+            // Silent: this is our own item, never prompts.
+            cachedToken = persisted
+            token = persisted
+        } else if let fresh = readAccessToken(service: sourceKeychainService) {
+            // First-ever run (or our cache got cleared): this one may prompt.
             cachedToken = fresh
+            persistOwnCachedToken(fresh)
             token = fresh
         } else {
             completion(.failure(.noCredentials))
@@ -62,18 +75,20 @@ final class UsageClient {
             case .success(let snapshot):
                 completion(.success(snapshot))
             case .failure(.unauthorized):
-                // Cached token stopped working (rotated or revoked) -- drop it
-                // and re-read from the Keychain once.
+                // Our cached token (in-memory or persisted) stopped working --
+                // it's genuinely stale, so re-sync from Claude Code's item.
+                // This is the only path that can still prompt.
                 guard let self else {
                     completion(.failure(.unauthorized))
                     return
                 }
                 self.cachedToken = nil
-                guard let retryToken = self.readAccessToken(), retryToken != token else {
+                guard let retryToken = self.readAccessToken(service: self.sourceKeychainService), retryToken != token else {
                     completion(.failure(.unauthorized))
                     return
                 }
                 self.cachedToken = retryToken
+                self.persistOwnCachedToken(retryToken)
                 self.performRequest(token: retryToken, completion: completion)
             case .failure(let error):
                 completion(.failure(error))
@@ -153,10 +168,12 @@ final class UsageClient {
         return UsageWindow(utilization: utilization, resetsAt: resetsAt)
     }
 
-    private func readAccessToken() -> String? {
+    /// Reads Claude Code's OAuth token from its own Keychain item. Cross-app
+    /// access -- macOS may show its confirmation prompt here.
+    private func readAccessToken(service: String) -> String? {
         let query: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
-            kSecAttrService as String: keychainService,
+            kSecAttrService as String: service,
             kSecReturnData as String: true,
             kSecMatchLimit as String: kSecMatchLimitOne
         ]
@@ -175,6 +192,41 @@ final class UsageClient {
         }
 
         return accessToken
+    }
+
+    /// Reads our own persisted copy of the token. Same-app access -- never prompts.
+    private func readOwnCachedToken() -> String? {
+        let query: [String: Any] = [
+            kSecClass as String: kSecClassGenericPassword,
+            kSecAttrService as String: cacheKeychainService,
+            kSecReturnData as String: true,
+            kSecMatchLimit as String: kSecMatchLimitOne
+        ]
+
+        var item: CFTypeRef?
+        let status = SecItemCopyMatching(query as CFDictionary, &item)
+
+        guard status == errSecSuccess, let data = item as? Data, let token = String(data: data, encoding: .utf8) else {
+            return nil
+        }
+        return token
+    }
+
+    /// Writes our own persisted copy of the token. Same-app access -- never prompts.
+    private func persistOwnCachedToken(_ token: String) {
+        let data = Data(token.utf8)
+        let baseQuery: [String: Any] = [
+            kSecClass as String: kSecClassGenericPassword,
+            kSecAttrService as String: cacheKeychainService
+        ]
+
+        let updateStatus = SecItemUpdate(baseQuery as CFDictionary, [kSecValueData as String: data] as CFDictionary)
+        guard updateStatus == errSecItemNotFound else { return }
+
+        var addQuery = baseQuery
+        addQuery[kSecValueData as String] = data
+        addQuery[kSecAttrAccessible as String] = kSecAttrAccessibleAfterFirstUnlock
+        SecItemAdd(addQuery as CFDictionary, nil)
     }
 }
 

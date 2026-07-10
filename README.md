@@ -58,9 +58,13 @@ rm -rf /Applications/ClaudeUsage.app
 
 ## How it works
 
-Claude Code stores your OAuth token in the macOS Keychain under the service name `Claude Code-credentials`. This app reads that token locally and calls Anthropic's usage endpoint (`GET /api/oauth/usage`) to get your current 5-hour and weekly utilization — the same numbers Claude Code shows with `/usage`. Nothing is sent anywhere except Anthropic's API; there's no third-party server involved.
+Claude Code stores your OAuth token in the macOS Keychain under the service name `Claude Code-credentials`. This app reads that token and calls Anthropic's usage endpoint (`GET /api/oauth/usage`) to get your current 5-hour and weekly utilization — the same numbers Claude Code shows with `/usage`. Nothing is sent anywhere except Anthropic's API; there's no third-party server involved.
 
 This uses an internal, undocumented API endpoint, so it could change or break without notice.
+
+**A note on how the token is cached, and the tradeoff involved.** Reading another app's Keychain item (`Claude Code-credentials` belongs to Claude Code, not this app) is a cross-app access that macOS gates behind a confirmation prompt — and for a self-signed app like this one (see [Troubleshooting](#troubleshooting)), that prompt doesn't stay silenced permanently; it resurfaces periodically. To avoid re-prompting on every launch and every poll, this app copies the token into a **second Keychain item that it creates and owns** (`com.gokul.claude-usage.token-cache`). Reading back an item you created yourself is never prompted by macOS, regardless of code signing — so normal operation never touches Claude Code's item at all, only this app's own copy.
+
+The tradeoff: there are now two Keychain items holding the same live OAuth token instead of one, each protected only by ordinary Keychain access control rather than the stronger cross-app confirmation gate. If you'd rather not have that second copy, don't run a build with this caching — the alternative is accepting the periodic re-prompt described in Troubleshooting instead.
 
 ## Troubleshooting
 
