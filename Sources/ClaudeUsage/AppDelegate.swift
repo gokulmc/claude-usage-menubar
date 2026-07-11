@@ -6,6 +6,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private var statusItem: NSStatusItem!
     private let usageClient = UsageClient()
     private var refreshTimer: Timer?
+    private var retryTimer: Timer?
 
     private var lastSnapshot: UsageSnapshot?
     private var lastError: UsageError?
@@ -106,11 +107,22 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
                     self.lastSnapshot = snapshot
                     self.lastError = nil
                     self.isStale = false
+                    self.retryTimer?.invalidate()
+                    self.retryTimer = nil
                 case .failure(let error):
                     self.lastError = error
                     if self.lastSnapshot != nil {
                         // Keep showing the last known values but mark them stale.
                         self.isStale = true
+                    } else if self.retryTimer == nil {
+                        // Nothing to show yet (e.g. a transient failure right
+                        // after login) -- retry well before the regular
+                        // 15-minute cycle instead of sitting in the error
+                        // state for that long.
+                        self.retryTimer = Timer.scheduledTimer(withTimeInterval: 60, repeats: false) { [weak self] _ in
+                            self?.retryTimer = nil
+                            self?.performRefresh()
+                        }
                     }
                 }
                 self.updateIcon()
@@ -182,6 +194,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             return "Open Claude Code to refresh credentials"
         case .network:
             return "Network error"
+        case .http(let code):
+            return "Server error (HTTP \(code))"
         case .decode:
             return "Unexpected response"
         }

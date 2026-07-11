@@ -26,6 +26,7 @@ enum UsageError: Error {
     case badCredentials
     case unauthorized
     case network(Error)
+    case http(Int)
     case decode
 }
 
@@ -107,8 +108,17 @@ final class UsageClient {
                 completion(.failure(.network(error)))
                 return
             }
-            if let http = response as? HTTPURLResponse, http.statusCode == 401 {
-                completion(.failure(.unauthorized))
+            if let http = response as? HTTPURLResponse, !(200..<300).contains(http.statusCode) {
+                NSLog("usage fetch failed: HTTP %d", http.statusCode)
+                // An *invalid* token comes back as 401, but an *expired* one
+                // (the normal state of our persisted cache after a day away)
+                // comes back as a different 4xx -- treat any auth-shaped
+                // status as "re-sync the token from Claude Code's item".
+                if http.statusCode == 401 || http.statusCode == 403 {
+                    completion(.failure(.unauthorized))
+                } else {
+                    completion(.failure(.http(http.statusCode)))
+                }
                 return
             }
             guard let data else {

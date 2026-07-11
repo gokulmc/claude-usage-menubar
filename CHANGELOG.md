@@ -1,5 +1,10 @@
 # Changelog
 
+## v1.2.1
+
+- Fix: an expired cached token could wedge the app in a permanent "Unexpected response" state. The API returns 401 for *invalid* tokens but a different status for *expired* ones, and only 401 triggered a re-read of Claude Code's fresh token. Any auth-shaped failure now re-syncs, other HTTP errors show as "Server error (HTTP n)", and failed statuses are logged for diagnosis.
+- Fix: if the first fetch after launch fails (e.g. flaky network right after login), the app now retries after 60 seconds instead of showing the error state for the full 15-minute cycle.
+
 ## v1.2.0
 
 - The token is now also cached in a second Keychain item this app creates and owns, so normal operation no longer touches Claude Code's item (and therefore rarely triggers macOS's confirmation prompt at all) — only when the underlying token actually rotates. See the README's "How it works" section for the security tradeoff this involves before building it yourself.
