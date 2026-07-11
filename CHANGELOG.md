@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## v1.2.0
 
 - The token is now also cached in a second Keychain item this app creates and owns, so normal operation no longer touches Claude Code's item (and therefore rarely triggers macOS's confirmation prompt at all) — only when the underlying token actually rotates. See the README's "How it works" section for the security tradeoff this involves before building it yourself.
 - The app now has a proper icon (the dual-ring motif on a dark squircle), shown in Finder, the DMG, Login Items, and permission dialogs instead of the generic blank-app icon.
