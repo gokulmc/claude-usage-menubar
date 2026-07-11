@@ -20,6 +20,7 @@ mkdir -p "${APP_BUNDLE}/Contents/Resources"
 
 cp "${BUILD_DIR}/${APP_NAME}" "${APP_BUNDLE}/Contents/MacOS/${APP_NAME}"
 cp "Support/Info.plist" "${APP_BUNDLE}/Contents/Info.plist"
+cp "Support/AppIcon.icns" "${APP_BUNDLE}/Contents/Resources/AppIcon.icns"
 
 if security find-certificate -c "${SIGN_IDENTITY}" >/dev/null 2>&1; then
     echo "==> Code signing (${SIGN_IDENTITY})"

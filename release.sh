@@ -35,6 +35,7 @@ mkdir -p "${APP_BUNDLE}/Contents/MacOS"
 mkdir -p "${APP_BUNDLE}/Contents/Resources"
 cp "${BUILD_DIR}/${APP_NAME}" "${APP_BUNDLE}/Contents/MacOS/${APP_NAME}"
 cp "Support/Info.plist" "${APP_BUNDLE}/Contents/Info.plist"
+cp "Support/AppIcon.icns" "${APP_BUNDLE}/Contents/Resources/AppIcon.icns"
 
 echo "==> Code signing (ad-hoc, for a stable standalone identity)"
 codesign --force --deep --sign - "${APP_BUNDLE}"

@@ -1,3 +1,5 @@
+<p align="center"><img src="docs/logo.png" width="128" alt="Claude Usage app icon"></p>
+
 # Claude Usage
 
 A tiny macOS menu bar app that shows your Claude usage at a glance — two rings, always visible, no need to open a browser tab.
