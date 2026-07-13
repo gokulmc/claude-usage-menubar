@@ -1,5 +1,9 @@
 # Changelog
 
+## v1.3.0
+
+- Redesigned app icon in a Liquid Glass style to match macOS Tahoe: rounder squircle, smoked-glass gradient, rim light, and glowing rings. (The dropdown already picks up the system's glass material automatically on Tahoe — it's a native menu.)
+
 ## v1.2.1
 
 - Fix: an expired cached token could wedge the app in a permanent "Unexpected response" state. The API returns 401 for *invalid* tokens but a different status for *expired* ones, and only 401 triggered a re-read of Claude Code's fresh token. Any auth-shaped failure now re-syncs, other HTTP errors show as "Server error (HTTP n)", and failed statuses are logged for diagnosis.
