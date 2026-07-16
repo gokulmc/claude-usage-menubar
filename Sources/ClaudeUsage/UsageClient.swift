@@ -73,6 +73,29 @@ final class UsageClient {
 
         performRequest(token: token) { [weak self] result in
             switch result {
+            case .success(let snapshot) where Self.looksDead(snapshot):
+                // Claude Code rotates its OAuth token from under us, and a
+                // superseded token doesn't always come back as 401/403 --
+                // Anthropic can return a normal HTTP 200 with every window
+                // zeroed out and resets_at missing, i.e. "authenticated, but
+                // this session has nothing behind it anymore". That shape
+                // never occurs for a real account with any usage history, so
+                // treat it exactly like an expired token: drop the cache and
+                // re-sync once from Claude Code's fresh item.
+                NSLog("cached token returned a reset-less all-zero snapshot; re-syncing from source")
+                guard let self else {
+                    completion(.success(snapshot))
+                    return
+                }
+                self.cachedToken = nil
+                guard let retryToken = self.readAccessToken(service: self.sourceKeychainService), retryToken != token else {
+                    // Nothing fresher available -- show what we got rather than nothing.
+                    completion(.success(snapshot))
+                    return
+                }
+                self.cachedToken = retryToken
+                self.persistOwnCachedToken(retryToken)
+                self.performRequest(token: retryToken, completion: completion)
             case .success(let snapshot):
                 completion(.success(snapshot))
             case .failure(.unauthorized):
@@ -95,6 +118,13 @@ final class UsageClient {
                 completion(.failure(error))
             }
         }
+    }
+
+    /// A live account with any usage history always has a resets_at on both
+    /// windows -- there's no legitimate state where both are simultaneously
+    /// absent. Missing on both is the fingerprint of a superseded token.
+    private static func looksDead(_ snapshot: UsageSnapshot) -> Bool {
+        snapshot.fiveHour.resetsAt == nil && snapshot.sevenDay.resetsAt == nil
     }
 
     private func performRequest(token: String, completion: @escaping (Result<UsageSnapshot, UsageError>) -> Void) {

@@ -1,5 +1,9 @@
 # Changelog
 
+## v1.3.1
+
+- Fix: a rotated-but-not-yet-401ing Claude Code token could leave the app permanently stuck showing all zeros. Anthropic's usage endpoint can return a normal HTTP 200 for a superseded token, with every window zeroed out and no reset times — a shape that never occurs for a real account, but wasn't being treated as a failure. The app now recognizes that fingerprint and automatically re-syncs the token from Claude Code's Keychain item, self-healing without user action.
+
 ## v1.3.0
 
 - Redesigned app icon in a Liquid Glass style to match macOS Tahoe: rounder squircle, smoked-glass gradient, rim light, and glowing rings. (The dropdown already picks up the system's glass material automatically on Tahoe — it's a native menu.)
