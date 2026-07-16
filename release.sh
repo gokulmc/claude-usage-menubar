@@ -3,13 +3,9 @@
 # people who just want to download and run the app without installing
 # Swift or building from source.
 #
-# Deliberately signs ad-hoc rather than with the local dev identity from
-# setup-signing.sh: that identity's trust is only meaningful on this machine,
-# so shipping a binary "signed" by it would be misleading. A downloaded,
-# never-rebuilt binary only needs a *stable* identity (so a single "Always
-# Allow" click sticks), and ad-hoc signing already gives that -- there's no
-# untrusted certificate chain involved, so none of the re-validation/re-prompt
-# behavior documented in the README's Troubleshooting section applies here.
+# Signs with the Developer ID identity and notarizes the app before packaging
+# into the DMG, so the downloaded app launches without Gatekeeper warnings and
+# "Always Allow" on the Keychain prompt genuinely sticks.
 set -euo pipefail
 
 cd "$(dirname "$0")"
@@ -37,8 +33,8 @@ cp "${BUILD_DIR}/${APP_NAME}" "${APP_BUNDLE}/Contents/MacOS/${APP_NAME}"
 cp "Support/Info.plist" "${APP_BUNDLE}/Contents/Info.plist"
 cp "Support/AppIcon.icns" "${APP_BUNDLE}/Contents/Resources/AppIcon.icns"
 
-echo "==> Code signing (ad-hoc, for a stable standalone identity)"
-codesign --force --deep --sign - "${APP_BUNDLE}"
+echo "==> Signing + notarizing (Developer ID)"
+notarize-app "${APP_BUNDLE}"
 
 echo "==> Building ${DMG_NAME}"
 ln -s /Applications "${STAGING_DIR}/Applications"
@@ -47,6 +43,3 @@ hdiutil create -volname "${APP_NAME}" -srcfolder "${STAGING_DIR}" -ov -format UD
 rm -rf "${STAGING_DIR}"
 
 echo "Done: ${DMG_NAME}"
-echo "Note: this build isn't notarized. On first launch, right-click the app"
-echo "in /Applications and choose Open, since Gatekeeper will otherwise warn"
-echo "about an unidentified developer."

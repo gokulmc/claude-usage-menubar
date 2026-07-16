@@ -14,9 +14,7 @@ A tiny macOS menu bar app that shows your Claude usage at a glance — two rings
 
 ## Download
 
-**[Download the latest release](https://github.com/gokulmc/claude-usage-menubar/releases/latest)** — open the `.dmg` and drag ClaudeUsage into Applications. No Xcode or Swift needed.
-
-This build isn't notarized (no Apple Developer account behind it), so macOS will warn about an unidentified developer on first launch. Right-click the app in Applications and choose **Open** to bypass that, just once.
+**[Download the latest release](https://github.com/gokulmc/claude-usage-menubar/releases/latest)** — open the `.dmg` and drag ClaudeUsage into Applications. No Xcode or Swift needed. The DMG is Developer ID signed and notarized, so Gatekeeper won't show a warning and "Always Allow" on the one-time Keychain permission prompt genuinely sticks.
 
 Prefer to build it yourself instead? See [Build from source](#build-from-source) below.
 
@@ -64,19 +62,24 @@ Claude Code stores your OAuth token in the macOS Keychain under the service name
 
 This uses an internal, undocumented API endpoint, so it could change or break without notice.
 
-**A note on how the token is cached, and the tradeoff involved.** Reading another app's Keychain item (`Claude Code-credentials` belongs to Claude Code, not this app) is a cross-app access that macOS gates behind a confirmation prompt — and for a self-signed app like this one (see [Troubleshooting](#troubleshooting)), that prompt doesn't stay silenced permanently; it resurfaces periodically. To avoid re-prompting on every launch and every poll, this app copies the token into a **second Keychain item that it creates and owns** (`com.gokul.claude-usage.token-cache`). Reading back an item you created yourself is never prompted by macOS, regardless of code signing — so normal operation never touches Claude Code's item at all, only this app's own copy.
+**A note on how the token is cached, and the tradeoff involved.** Reading another app's Keychain item (`Claude Code-credentials` belongs to Claude Code, not this app) is a cross-app access that macOS gates behind a confirmation prompt. To avoid re-prompting on every launch and every poll, this app copies the token into a **second Keychain item that it creates and owns** (`com.gokul.claude-usage.token-cache`). Reading back an item you created yourself is never prompted by macOS, regardless of code signing — so normal operation never touches Claude Code's item at all, only this app's own copy.
 
-The tradeoff: there are now two Keychain items holding the same live OAuth token instead of one, each protected only by ordinary Keychain access control rather than the stronger cross-app confirmation gate. If you'd rather not have that second copy, don't run a build with this caching — the alternative is accepting the periodic re-prompt described in Troubleshooting instead.
+- **If you use the downloadable DMG** (Developer ID signed + notarized): "Always Allow" on the one-time confirmation prompt genuinely sticks, and the token cache makes that prompt rare anyway. The second Keychain copy is straightforward convenience.
+- **If you build from source** with a self-signed identity: "Always Allow" doesn't stay silenced permanently on its own (see [Troubleshooting](#troubleshooting) for why). In this path the token cache is more than convenience — it's what makes the app usable without repeated password prompts. The second copy is still protected by FileVault + per-user Keychain permissions, but note that there are now two Keychain items holding the same live OAuth token instead of one.
+
+Neither path sends your credentials anywhere except Anthropic's own API; there's no third-party server involved.
 
 ## Troubleshooting
 
 **Menu bar item shows a gray "!" badge.** The last refresh failed — usually because Claude Code's credentials need refreshing. Open Claude Code and run any command, then click **Refresh Now** in the app's menu.
 
-**macOS asks for my login password when the app reads the Keychain.** Some of this is expected and some is fixable:
+**macOS asks for my login password when the app reads the Keychain.**
 
-- *Expected:* the first-ever read of Claude Code's credentials item, and again whenever Claude Code rotates its token and the app has to re-read it. Thanks to the app's own token cache (see [How it works](#how-it-works)), normal launches and polls in between never touch that item, so this should be occasional, not constant.
-- *Every time you rebuild:* the app is ad-hoc signed (no `ClaudeUsageLocalSign` identity was found), so each rebuild produces a new binary hash that macOS treats as a "different app." Run `./setup-signing.sh` once, then `./build.sh` — rebuilds then reuse one stable identity.
-- *The hard limit:* clicking "Always Allow" never sticks permanently for this app, no matter what. macOS only grants durable silent Keychain access to code signed with a certificate that chains to Apple's root (a paid Developer ID certificate); for self-signed or ad-hoc builds, `securityd` re-validates on its own schedule and re-prompts every so often (observed anywhere from ~15 to ~65 minutes when the app reads the cross-app item repeatedly). The token cache exists precisely to make those cross-app reads rare, which is the best that can be done without an Apple Developer account.
+- *If you use the downloadable DMG:* the app is Developer ID signed and notarized. The first launch will ask once — click **Always Allow** and you won't see it again unless Claude Code rotates its token (infrequent). The token cache handles normal operation silently.
+- *If you build from source:* some of this is expected and some is fixable.
+  - *Expected:* the first-ever read of Claude Code's credentials item, and again whenever Claude Code rotates its token and the app has to re-read it. Thanks to the token cache, normal launches and polls never touch that item, so this should be occasional.
+  - *Every time you rebuild:* the app is ad-hoc signed (no `ClaudeUsageLocalSign` identity was found), so each rebuild produces a new binary hash that macOS treats as a "different app." Run `./setup-signing.sh` once, then `./build.sh`.
+  - *The hard limit:* "Always Allow" doesn't stick permanently for self-signed code. macOS only grants durable silent Keychain access to code with a certificate that chains to Apple's root (a paid Developer ID certificate); for self-signed or ad-hoc builds, `securityd` re-validates on its own schedule. The token cache makes those cross-app reads rare, which is the best that can be done without an Apple Developer account.
 
 **Can it use Touch ID instead of a password?** No — this specific Keychain authorization dialog is a legacy dialog type that macOS never offers Touch ID for, even on Macs with Touch ID enrolled. Nothing the app can do about it; the mitigation is making the prompt rare (above), not making it more convenient.
 

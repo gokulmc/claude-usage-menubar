@@ -3,6 +3,7 @@
 ## v1.3.0
 
 - Redesigned app icon in a Liquid Glass style to match macOS Tahoe: rounder squircle, smoked-glass gradient, rim light, and glowing rings. (The dropdown already picks up the system's glass material automatically on Tahoe — it's a native menu.)
+- **The DMG is now Developer ID signed and notarized.** No more Gatekeeper bypass dance, and "Always Allow" on the one-time Keychain prompt genuinely sticks.
 
 ## v1.2.1
 
